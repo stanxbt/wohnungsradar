@@ -1,0 +1,142 @@
+# ============================================================
+#  Wohnungsradar Hamburg – Konfiguration
+#  Hier können Kriterien und Quellen jederzeit angepasst werden.
+# ============================================================
+
+kriterien:
+  # Gewünschte Stadtteile (Treffer im Text = passend)
+  stadtteile:
+    - Eppendorf
+    - Winterhude
+    - Uhlenhorst
+    - Rotherbaum
+    - Harvestehude
+    - Altstadt
+    - HafenCity
+    - Eimsbüttel
+    - Neustadt
+  # Postleitzahlen dieser Stadtteile (grob; eine PLZ kann mehrere Stadtteile abdecken)
+  postleitzahlen: [20249, 20251, 22299, 22301, 22303, 22081, 22085, 22087,
+                   20144, 20146, 20148, 20149, 20357, 20253, 20255, 20257,
+                   20259, 20095, 20457, 20459, 20354, 20355]
+
+  min_zimmer: 2
+  min_flaeche: 40          # m²
+  max_kaltmiete: 1200      # €
+
+  # Muss-Kriterien: explizites "kein Balkon" etc. -> ausgeschlossen,
+  # nicht erwähnt -> Meldung trotzdem, aber mit ❓ markiert
+  muss:
+    einbaukueche: true
+    balkon: true
+
+  # No-Gos: werden diese im Text gefunden, gibt es keine Meldung
+  ausschluss:
+    moebliert: true
+    befristet: true
+    nachtspeicher: true
+    dachgeschoss: true
+
+  # Wünsche (nur als ⭐ in der Meldung markiert)
+  wuensche:
+    altbau: true
+    dielen: true
+    frei_ab: ["01.12.", "01.01.", "dezember", "januar"]
+
+# ------------------------------------------------------------
+#  Quellen
+#  url         = Seite mit den Mietangeboten
+#  auto: true  = url ist nur die Startseite; das Skript sucht selbst
+#                nach Unterseiten wie "Vermietung" / "Mietangebote"
+#  aktiv: false = Quelle wird übersprungen
+#  Für Portale (z. B. ohne-makler.net) einfach die URL einer
+#  gefilterten Suche einfügen.
+# ------------------------------------------------------------
+quellen:
+  # --- Angebotsseite direkt bekannt ---
+  - name: Gerd Mulsow & Co.
+    url: https://www.mulsow.co/mietwohnungen
+  - name: Gustafsen & Co
+    url: https://www.gustafsen.de/immobilien/wohnen/vermietungsobjekte/
+  - name: Groth & Schneider
+    url: https://www.grothschneider.de/aktuelle-angebote/
+  - name: Baugenossenschaft dhu
+    url: https://dhu.hamburg/wohnen/wohnungsangebote/
+  - name: J. Bentin Immobilien
+    url: https://www.bentin-immobilien.com/vermietung.html
+
+  # --- Startseite bekannt, Angebotsseite wird automatisch gesucht ---
+  - name: Theodor Schöne
+    url: https://theodor-schoene.com/
+    auto: true
+  - name: Gerstel KG
+    url: https://www.gerstel-kg.de/
+    auto: true
+  - name: Dr. O. Campe & Co.
+    url: https://www.dr-campe-immobilien.de/
+    auto: true
+  - name: AGESA
+    url: https://www.agesa-vermietung.de/
+    auto: true
+  - name: Sonntag Verwaltung
+    url: http://sonntag-verwaltung.de/
+    auto: true
+  - name: Gebrüder Geist (GGI)
+    url: https://www.ggi-hamburg.de/
+    auto: true
+  - name: HS Immobilien (Hajo Skoppek)
+    url: https://www.hsi-hh.de/
+    auto: true
+  - name: Dr. Mechkat & Cie.
+    url: https://dr-mechkat-immobilien.de/
+    auto: true
+  - name: Jakupi Immobilien
+    url: https://jakupi-immobilien.de/
+    auto: true
+  - name: John Steffens Immobilien
+    url: https://steffens-immobilien.de/
+    auto: true
+  - name: Schmidt & Bethge
+    url: https://www.schmidt-bethge-immobilien.de/
+    auto: true
+  - name: Richard Großmann
+    url: https://www.richardgrossmann.de/
+    auto: true
+  - name: Dr. Wentzel Immobilien
+    url: https://www.wentzel-dr.de/
+    auto: true
+  - name: Otto Lemke Immobilien
+    url: https://www.otto-lemke.de/
+    auto: true
+  - name: Grossmann & Berger
+    url: https://www.grossmann-berger.de/
+    auto: true
+  - name: Wullkopf & Eckelmann
+    url: https://www.wullkopf-eckelmann.de/
+    auto: true
+  - name: ISN
+    url: https://www.isn-online.net/
+    auto: true
+  - name: ohne-makler.net
+    url: https://www.ohne-makler.net/
+    auto: true
+
+  # --- Nur über ImmoScout24 (blockiert automatische Abrufe) ---
+  # Hinsch & Völckers hat Haueisen im Sept. 2026 übernommen; beide
+  # veröffentlichen nur auf ImmoScout24 -> dort Suchauftrag anlegen.
+  - name: Hinsch & Völckers / Haueisen
+    url: https://portal.immobilienscout24.de/ergebnisliste/56816324
+    aktiv: false
+
+  # --- Noch keine Website gefunden: URL eintragen und aktiv entfernen ---
+  - {name: RED Real Estate,            url: "", aktiv: false}
+  - {name: Goldbeck,                   url: "", aktiv: false}
+  - {name: IVD Verwaltung,             url: "", aktiv: false}
+  - {name: Letura,                     url: "", aktiv: false}
+  - {name: CG Immobilien,              url: "", aktiv: false}
+  - {name: GCV Verwaltungsgesellschaft, url: "", aktiv: false}
+  - {name: Görz Immobilien,            url: "", aktiv: false}
+  - {name: Bach & Co. Immobilien,      url: "", aktiv: false}
+  - {name: DVG Immobilien,             url: "", aktiv: false}
+  - {name: Steffens Immobilien (Eppendorfer Landstr. 160), url: "", aktiv: false}
+  # Hausverwaltung Diedenhofen: veröffentlicht keine Angebote online.
