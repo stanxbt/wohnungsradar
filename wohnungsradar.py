@@ -34,6 +34,8 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/128.0 Safari/537.36 Wohnungsradar/1.0 (private Wohnungssuche)")
 PAUSE = 1.5                 # Sekunden zwischen Abrufen (höflich bleiben)
 MAX_DETAILS_PRO_QUELLE = 10
+MAX_TREFFER_PRO_MAIL = 15
+MEHRDEUTIG = {"altstadt", "neustadt", "eppendorf"}
 WARNUNG_NACH_FEHLLAEUFEN = 36   # ~12 Std. bei 20-Minuten-Takt
 
 DRY = "--dry-run" in sys.argv
@@ -237,18 +239,26 @@ def bewerte(text, k):
         if fl < k["min_flaeche"]:
             grund.append("zu klein")
 
-    # Stadtteil
-    lage = [s for s in k["stadtteile"] if s.lower() in t]
-    plz = set(re.findall(r"\b(2[0-2]\d{3})\b", t))
-    plz_ok = {p for p in plz if int(p) in k["postleitzahlen"]}
-    if lage:
+    # Lage – streng: nur Wunsch-Stadtteile in Hamburg
+    # Maßgeblich ist die ERSTE Postleitzahl im Text (die der Wohnung;
+    # Büro-Adressen der Verwaltung stehen meist weiter unten).
+    lage = [s for s in k["stadtteile"]
+            if re.search(r"\b" + re.escape(s.lower()) + r"\b", t)]
+    plz_liste = [int(p) for p in re.findall(r"\b(\d{5})\s*,?\s*[a-zäöü]{3,}", t)]
+    erlaubt = set(k["postleitzahlen"])
+    if plz_liste:
+        erste = plz_liste[0]
+        if erste in erlaubt:
+            info["Lage"] = ", ".join(lage) if lage else f"PLZ {erste}"
+        elif 20000 <= erste <= 22999:
+            grund.append(f"Hamburg, aber anderer Stadtteil (PLZ {erste})")
+        else:
+            grund.append(f"nicht Hamburg (PLZ {erste})")
+    elif lage and ("hamburg" in t or any(x.lower() not in MEHRDEUTIG for x in lage)):
+        # Altstadt/Neustadt/Eppendorf gibt es auch anderswo -> dann muss "Hamburg" dabeistehen
         info["Lage"] = ", ".join(lage)
-    elif plz_ok:
-        info["Lage"] = "PLZ " + ", ".join(sorted(plz_ok))
-    elif plz:
-        grund.append("Stadtteil passt nicht")
     else:
-        fehlt.append("Lage")
+        grund.append("Lage nicht erkennbar / nicht Hamburg")
 
     # No-Gos
     a = k["ausschluss"]
@@ -335,13 +345,21 @@ def sende(text_html, text_plain, betreff="Wohnungsradar"):
         return
     tok, chats = os.getenv("TELEGRAM_BOT_TOKEN"), os.getenv("TELEGRAM_CHAT_ID", "")
     if tok and chats:
+        stuecke, akt = [], ""
+        for block in text_html.split("\n\n"):
+            if len(akt) + len(block) > 3800:
+                stuecke.append(akt); akt = ""
+            akt += ("\n\n" if akt else "") + block
+        stuecke.append(akt)
         for cid in [c.strip() for c in chats.split(",") if c.strip()]:
-            try:
-                requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
-                              data={"chat_id": cid, "text": text_html,
-                                    "parse_mode": "HTML"}, timeout=20).raise_for_status()
-            except Exception as ex:
-                print(f"Telegram-Fehler: {ex}")
+            for teil in stuecke:
+                try:
+                    requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                                  data={"chat_id": cid, "text": teil, "parse_mode": "HTML",
+                                        "disable_web_page_preview": "true"},
+                                  timeout=20).raise_for_status()
+                except Exception as ex:
+                    print(f"Telegram-Fehler: {ex}")
     host, to = os.getenv("SMTP_HOST"), os.getenv("MAIL_TO")
     if host and to:
         try:
@@ -411,6 +429,8 @@ def main():
     state = lade_state()
     quellen = state.setdefault("quellen", {})
     status = []
+    sammel = []                                   # alle Treffer dieses Laufs
+    gemeldet = set(state.get("gemeldet", []))     # nie doppelt melden
 
     for q in cfg["quellen"]:
         if q.get("aktiv") is False or not q.get("url"):
@@ -426,9 +446,10 @@ def main():
                 if b["grund"]:
                     print(f"   ✗ aussortiert ({', '.join(b['grund'])}): {url}")
                     continue
-                sende(meldung_text(q["name"], tit, url, b, True),
-                      meldung_text(q["name"], tit, url, b, False),
-                      f"Wohnungsradar: {tit[:60]}")
+                if url in gemeldet:
+                    continue
+                gemeldet.add(url)
+                sammel.append((q["name"], tit, url, b))
         except Exception as ex:
             st["fehler"] = st.get("fehler", 0) + 1
             status.append((q["name"], "fehler", str(ex)[:80]))
@@ -437,6 +458,19 @@ def main():
                 sende(f"⚠️ <b>{escape(q['name'])}</b> ist seit längerem nicht erreichbar.",
                       f"⚠️ {q['name']} ist seit längerem nicht erreichbar.",
                       "Wohnungsradar: Quelle nicht erreichbar")
+
+    # Alle Treffer dieses Laufs in EINER Nachricht
+    if sammel:
+        sammel.sort(key=lambda x: bool(x[3]["fehlt"]))   # 🟢 zuerst
+        sammel = sammel[:MAX_TREFFER_PRO_MAIL]
+        n = len(sammel)
+        kopf = f"🏠 {n} neue passende Wohnung{'en' if n > 1 else ''}"
+        teile_html = [meldung_text(*x, html=True) for x in sammel]
+        teile_txt = [meldung_text(*x, html=False) for x in sammel]
+        sende(f"<b>{kopf}</b>\n\n" + "\n\n".join(teile_html),
+              kopf + "\n\n" + "\n\n----------\n\n".join(teile_txt),
+              f"Wohnungsradar: {kopf[2:]}")
+    state["gemeldet"] = list(gemeldet)[-3000:]
 
     # Beim allerersten Lauf: Überblick schicken, welche Quellen funktionieren
     if not state.get("gestartet") or DIAG:

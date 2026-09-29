@@ -120,6 +120,7 @@ quellen:
   - name: ohne-makler.net
     url: https://www.ohne-makler.net/
     auto: true
+    aktiv: false          # pausiert (lieferte bundesweite Angebote)
 
   # --- Nur über ImmoScout24 (blockiert automatische Abrufe) ---
   # Hinsch & Völckers hat Haueisen im Sept. 2026 übernommen; beide
